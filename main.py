@@ -65,7 +65,7 @@ async def on_message(message: cl.Message):
                 if "$prefab" not in structured_content or "view" not in structured_content:
                     continue
 
-                logger.info(f"Rendering Prefab UI artifact")
+                logger.info("Rendering Prefab UI artifact")
                 await response_msg.update()
 
                 # cl.CustomElement props arrive empty — pass data via
