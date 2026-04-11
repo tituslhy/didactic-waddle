@@ -20,9 +20,6 @@ export default function RevenueChart() {
 
   const titleNode = view?.children?.find(n => n.type === "Heading");
 
-  // -----------------------------
-  // Glass BarChart (premium version)
-  // -----------------------------
   function BarChartNode({ node }) {
     const data = node?.data || [];
     const series = node?.series || [];
@@ -155,7 +152,7 @@ export default function RevenueChart() {
           })}
         </svg>
 
-        {/* Animation keyframes (scoped hack) */}
+        {/* Animation keyframes */}
         <style>{`
           @keyframes grow {
             from { transform: scaleY(0); transform-origin: bottom; }
