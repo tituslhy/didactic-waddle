@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 
 @cl.on_chat_start
 async def on_start():
-    llm = ChatOllama(model="qwen3.5:latest")
+    llm = ChatOllama(model="qwen3.5:latest", temperature=0)
 
     client = MultiServerMCPClient({
         "revenue_chart": {
@@ -22,7 +22,15 @@ async def on_start():
     })
 
     tools = await client.get_tools()
-    agent = create_agent(model=llm, tools=tools)
+    agent = create_agent(
+        model=llm, 
+        tools=tools,
+        system_prompt="""
+        You are a helpful assistant for business analysts. Use the tools at your disposal to answer the user's questions. 
+        When rendering charts, state that the chart is rendered and the user is free to explore and ask further questions. 
+        Don't need to caveat that you're just an AI and can't see the chart or actually a render a chart - the chart is rendered
+        for the user via tool calls that you make that pass the results to the frontend directly. """
+    )
 
     cl.user_session.set("agent", agent)
     await cl.Message(content="Ready! Ask me to show the 2025 revenue chart.").send()
@@ -75,8 +83,8 @@ async def on_message(message: cl.Message):
                 await anchor.send()
 
                 await cl.CustomElement(
-                    name="PrefabView",
-                    content=json.dumps(structured_content),
+                    name="RevenueChart",
+                    props = structured_content,
                 ).send(for_id=anchor.id)
 
                 ui_rendered = True

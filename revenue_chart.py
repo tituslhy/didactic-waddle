@@ -9,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 
 mcp = FastMCP("Dashboard")
 
-
 @mcp.tool(app=True)
 def revenue_chart(year: int) -> PrefabApp:
     """Show annual revenue as an interactive bar chart."""
