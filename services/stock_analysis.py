@@ -32,6 +32,7 @@ from prefab_ui.components import (
     Text,
 )
 from prefab_ui.components.charts import BarChart, ChartSeries
+from prefab_ui.components.control_flow import ForEach
 from prefab_ui.rx import RESULT, Rx
 
 # ── In-memory store ───────────────────────────────────────────────────────────
@@ -209,8 +210,6 @@ def stock_ticker_app() -> PrefabApp:
                 # One "Plot" button per loaded ticker
                 with If(loaded):
                     with Column(gap=2):         
-                        
-                        from prefab_ui.components.control_flow import ForEach
                                        
                         with ForEach("loaded") as item:
                             Button(
@@ -318,7 +317,6 @@ def stock_ticker_app() -> PrefabApp:
                 with Row(gap=2, align="center", css_class="flex-wrap"):
                     Muted("Loaded:")
                     
-                    from prefab_ui.components.control_flow import ForEach
                     with ForEach("loaded") as item:
                         Badge(item, variant="secondary")
                     Button(
