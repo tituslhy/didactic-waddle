@@ -46,12 +46,14 @@ async def on_message(message: cl.Message):
 
     ui_rendered = False
 
+    # Stream tokens
     async for chunk in agent.astream(
         {"messages": [{"role": "user", "content": message.content}]},
         stream_mode="updates",
     ):
         for node_output in chunk.values():
             for msg in node_output.get("messages", []):
+                
                 # Stream text tokens
                 content = getattr(msg, "content", "")
                 if isinstance(content, str) and content.strip():
