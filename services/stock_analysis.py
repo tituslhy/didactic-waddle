@@ -208,7 +208,10 @@ def stock_ticker_app() -> PrefabApp:
 
                 # One "Plot" button per loaded ticker
                 with If(loaded):
-                    with Column(gap=2):                        
+                    with Column(gap=2):         
+                        
+                        from prefab_ui.components.control_flow import ForEach
+                                       
                         with ForEach("loaded") as item:
                             Button(
                                 item,
@@ -314,6 +317,7 @@ def stock_ticker_app() -> PrefabApp:
             with If(loaded):
                 with Row(gap=2, align="center", css_class="flex-wrap"):
                     Muted("Loaded:")
+                    
                     from prefab_ui.components.control_flow import ForEach
                     with ForEach("loaded") as item:
                         Badge(item, variant="secondary")
