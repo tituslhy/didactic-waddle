@@ -8,7 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-
 @cl.on_chat_start
 async def on_start():
     llm = ChatOllama(model="qwen3.5:latest", temperature=0)
@@ -26,14 +25,12 @@ async def on_start():
         tools=tools,
         system_prompt="""
         You are a helpful assistant for business analysts. Use the tools at your disposal to answer the user's questions. 
-        When rendering charts, state that the chart is rendered and the user is free to explore and ask further questions. 
+        When rendering charts or apps, always be friendly and state that the chart/app is rendered and the user is free to explore and ask further questions. 
         Don't need to caveat that you're just an AI and can't see the chart or actually a render a chart - the chart is rendered
         for the user via tool calls that you make that pass the results to the frontend directly. """
     )
 
     cl.user_session.set("agent", agent)
-    await cl.Message(content="Ready! Ask me to show the 2025 revenue chart.").send()
-
 
 @cl.on_message
 async def on_message(message: cl.Message):
@@ -73,6 +70,10 @@ async def on_message(message: cl.Message):
 
                 if "$prefab" not in structured_content or "view" not in structured_content:
                     continue
+                
+                state = structured_content.get("state", {})
+                if not state.get("_is_chart"):
+                    continue  # let the agent describe the app shell in text instead
 
                 logger.info("Rendering Prefab UI artifact")
                 await response_msg.update()
@@ -84,7 +85,7 @@ async def on_message(message: cl.Message):
                 await anchor.send()
 
                 await cl.CustomElement(
-                    name="RevenueChart",
+                    name="StockDashboard",
                     props = structured_content,
                 ).send(for_id=anchor.id)
 

@@ -42,7 +42,7 @@ ticker_data: dict[str, Any] = {}
 app = FastMCPApp("Stock Analysis")
 
 # ── Backend tool 1: fetch all tickers ─────────────────────────────────────────
-@app.tool()
+@app.tool(model=True)
 def get_info_for_tickers(
     tickers: Annotated[List[str], "List of stock ticker symbols, e.g. ['AAPL', 'GOOG']"],
     period: Optional[Annotated[str, "data period, e.g. '1mo', '3mo', '1y', '5y'"]] = "3mo",
@@ -80,7 +80,7 @@ def get_info_for_tickers(
 
 
 # ── Backend tool 2: get data for a single ticker ──────────────────────────────
-@app.tool()
+@app.tool(model=True)
 def get_individual_ticker_data(
     ticker: str,
 ) -> Dict[str, List[dict]] | None:
@@ -109,7 +109,7 @@ def get_individual_ticker_data(
 
 
 # ── Backend tool 3: build the chart dashboard for one ticker ─────────────────
-@app.tool()
+@app.tool(model=True)
 def build_ticker_dashboard(ticker: str) -> PrefabApp:
     """
     Build a Prefab chart dashboard for one ticker (4 sub-charts: Close, High, Low, Open, Volume).
@@ -164,7 +164,7 @@ def build_ticker_dashboard(ticker: str) -> PrefabApp:
                     bar_size=3,
                 )
 
-    return PrefabApp(view=view)
+    return PrefabApp(view=view, state={"_is_chart": True})
 
 
 # ── UI entry point ────────────────────────────────────────────────────────────
