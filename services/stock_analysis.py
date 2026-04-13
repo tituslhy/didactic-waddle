@@ -41,8 +41,6 @@ ticker_data: dict[str, Any] = {}
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastMCPApp("Stock Analysis")
 
-# ── Backend tool 1: fetch all tickers ─────────────────────────────────────────
-@app.tool(model=True)
 def get_info_for_tickers(
     tickers: Annotated[List[str], "List of stock ticker symbols, e.g. ['AAPL', 'GOOG']"],
     period: Optional[Annotated[str, "data period, e.g. '1mo', '3mo', '1y', '5y'"]] = "3mo",
@@ -82,7 +80,10 @@ def get_info_for_tickers(
 # ── Backend tool 2: get data for a single ticker ──────────────────────────────
 @app.tool(model=True)
 def get_individual_ticker_data(
-    ticker: str,
+    ticker: Annotated[List[str], "Ticker symbols, e.g. ['AAPL', 'GOOG']"],
+    period: Optional[Annotated[str, "data period, e.g. '1mo', '3mo', '1y', '5y'"]] = "3mo",
+    start_date: Optional[Annotated[str, "start date in YYYY-MM-DD format"]] = None,
+    end_date: Optional[Annotated[str, "end date in YYYY-MM-DD format"]] = None,
 ) -> Dict[str, List[dict]] | None:
     """
     Get historical OHLCV records for a single ticker as a list of dicts.
@@ -90,7 +91,8 @@ def get_individual_ticker_data(
     """
     df = ticker_data.get(ticker)
     if not isinstance(df, pd.DataFrame):
-        return None
+        get_info_for_tickers(tickers=[ticker], period=period, start_date=start_date, end_date=end_date)
+        df = ticker_data.get(ticker)
 
     keep = [c for c in ["Date", "Open", "High", "Low", "Close", "Volume"] if c in df.columns]
     out = df[keep].copy()

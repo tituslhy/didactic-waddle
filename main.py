@@ -25,9 +25,13 @@ async def on_start():
         tools=tools,
         system_prompt="""
         You are a helpful assistant for business analysts. Use the tools at your disposal to answer the user's questions. 
-        When rendering charts or apps, always be friendly and state that the chart/app is rendered and the user is free to explore and ask further questions. 
-        Don't need to caveat that you're just an AI and can't see the chart or actually a render a chart - the chart is rendered
-        for the user via tool calls that you make that pass the results to the frontend directly. """
+        When solving a task:
+        1. FIRST explain briefly what you are going to do before calling any tools.
+        2. THEN call the necessary tools.
+        3. AFTER the tool calls are complete. Tell the user that you have completed the task and invite the user to ask more questions.
+
+        Always produce BOTH a pre-tool explanation and a post-tool explanation.
+        Do not skip either."""
     )
 
     cl.user_session.set("agent", agent)
@@ -42,6 +46,12 @@ async def on_message(message: cl.Message):
 
     ui_rendered = False
 
+    current_step = None
+
+    tool_in_progress = False
+    pending_ui = None
+    post_text_buffer = []
+
     # Stream tokens
     async for chunk in agent.astream(
         {"messages": [{"role": "user", "content": message.content}]},
@@ -51,44 +61,93 @@ async def on_message(message: cl.Message):
             for msg in node_output.get("messages", []):
                 
                 # Stream text tokens
-                content = getattr(msg, "content", "")
-                if isinstance(content, str) and content.strip():
-                    if not getattr(msg, "tool_call_id", None):
+                content = getattr(msg, "content", "")    
+                
+                # ---- TOOL CALL DETECTION ----
+                tool_calls = getattr(msg, "tool_calls", None)
+                if tool_calls:
+                    tool_name = tool_calls[0].get("name", "unknown_tool")
+
+                    logger.info(f"Tool call detected: {tool_name}")
+
+                    tool_in_progress = True
+
+                    current_step = cl.Step(name=f"{tool_name} tool")
+                    await current_step.send()
+
+                # ---- TOOL RESULT ----
+                if msg.__class__.__name__ == "ToolMessage":
+                    if current_step:
+                        if isinstance(content, list):
+                            content = "".join(
+                                item.get("text", "") if isinstance(item, dict) else str(item)
+                                for item in content
+                            )
+                        elif not isinstance(content, str):
+                            content = str(content)
+
+                        await current_step.stream_token(content)
+
+                        # End of tool execution
+                        await current_step.update()
+                        current_step = None
+                        tool_in_progress = False
+                    
+                    # DO NOT continue here so artifact parsing still happens
+
+                # ---- NORMAL TEXT STREAMING ----
+                if isinstance(content, list):
+                    content = "".join(
+                        item.get("text", "") if isinstance(item, dict) else str(item)
+                        for item in content
+                    )
+                elif not isinstance(content, str):
+                    content = str(content)
+
+                if content.strip() and msg.__class__.__name__ != "ToolMessage":
+                    if tool_in_progress:
+                        post_text_buffer.append(content)
+                    else:
                         await response_msg.stream_token(content)
 
                 # Detect Prefab UI artifact
-                if ui_rendered:
-                    continue
+                # ---- PREFAB UI ARTIFACT DETECTION (FIXED) ----
+                artifact = None
 
-                artifact = getattr(msg, "artifact", None)
-                if not isinstance(artifact, dict):
-                    continue
+                # Try multiple known locations (LangChain/MCP variants)
+                if hasattr(msg, "artifact"):
+                    artifact = msg.artifact
 
-                structured_content = artifact.get("structured_content")
-                if not isinstance(structured_content, dict):
-                    continue
+                if artifact is None and hasattr(msg, "additional_kwargs"):
+                    artifact = msg.additional_kwargs.get("artifact")
 
-                if "$prefab" not in structured_content or "view" not in structured_content:
-                    continue
-                
-                state = structured_content.get("state", {})
-                if not state.get("_is_chart"):
-                    continue  # let the agent describe the app shell in text instead
+                if artifact is None:
+                    artifact = getattr(msg, "__dict__", {}).get("artifact")
 
-                logger.info("Rendering Prefab UI artifact")
-                await response_msg.update()
+                if isinstance(artifact, dict):
+                    structured_content = artifact.get("structured_content")
 
-                # cl.CustomElement props arrive empty — pass data via
-                # the `content` field as a JSON string instead, which
-                # Chainlit does forward reliably to the JSX component.
-                anchor = cl.Message(content="")
-                await anchor.send()
+                    if isinstance(structured_content, dict):
+                        prefab = structured_content.get("$prefab")
 
-                await cl.CustomElement(
-                    name="StockDashboard",
-                    props = structured_content,
-                ).send(for_id=anchor.id)
+                        if prefab and "view" in structured_content:
+                            logger.info("Buffering Prefab UI artifact")
+                            pending_ui = structured_content
+    if current_step:
+        await current_step.update()
 
-                ui_rendered = True
+    # Flush any buffered post-tool text FIRST (so narration appears before UI)
+    if post_text_buffer:
+        for chunk in post_text_buffer:
+            await response_msg.stream_token(chunk)
 
-    await response_msg.update()
+    # Finalize the text message before rendering UI
+    if response_msg.id:
+        await response_msg.update()
+
+    # Render UI AFTER message is fully finalized
+    if pending_ui:
+        await cl.CustomElement(
+            name="StockDashboard",
+            props=pending_ui,
+        ).send(for_id=response_msg.id)
